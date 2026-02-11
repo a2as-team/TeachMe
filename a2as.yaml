@@ -1,0 +1,425 @@
+manifest:
+  version: "0.1.3"
+  schema: https://a2as.org/cert/schema
+  subject:
+    name: jkion2/teachme
+    source: https://github.com/jkion2/teachme
+    branch: main
+    commit: "56dc9165"
+    scope: [backend/manim_agents.py, backend/manim_gen.py, backend/manim_utils.py, backend/service_chat.py]
+  issued:
+    by: A2AS.org
+    at: '2026-02-11T17:02:14Z'
+    url: https://a2as.org/certified/agents/jkion2/teachme
+  signatures:
+    digest: sha256:n0LE2HhKlc66-mCzAAv-13D48xi1tSU83du-z6BcHvg
+    key: ed25519:-mv-qZQZFRtkYLFuMXBFq_GW4mwUTp_Q5Yqhsvxe5zI
+    sig: ed25519:cOhoc_Kmgny7TkGGCHz48NB33drkMu2tX8gG24OH1kV5c8nSLXnHNInFk_ol_HIyCjQ8ohVdpChhE76OpPaiCw
+
+agents:
+  agent:
+    type: instance
+    models: [gemini-2.5-flash]
+    tools: [math_agent, script_agent, video_agent]
+    params:
+      name: orchestrator_agent
+      instruction:
+        function: load_prompt_template
+        type: file_load
+        file: templates/orchestrator.md
+      before_agent_callback: agent_invoke_callback
+      function: initialize_agent
+  conversation_agent:
+    type: instance
+    models: [gemini-2.0-flash]
+    params:
+      name: conversation_agent
+      instruction: ['You are an expert math and science tutor. Your role is to help students understand problems by:', '1.
+          Breaking down complex concepts into simple, digestible steps', 2. Providing clear explanations with concrete examples,
+        3. Asking guided questions to check understanding, 4. Offering alternative approaches when students are stuck, 5.
+          Encouraging critical thinking and problem-solving skills, 6. Using analogies and real-world examples to make concepts
+          relatable, 'Teaching Style Guidelines:', '- Always be patient, encouraging, and supportive', '- Focus on helping
+          students learn the process, not just getting the answer', '- Encourage students to think through problems step-by-step',
+        '- Provide hints rather than direct answers when appropriate', '- Celebrate progress and learning moments', '- Ask
+          follow-up questions to ensure understanding', Keep responses concise but thorough. Adapt your explanations to the
+          student's level of understanding.]
+      description: An expert educational tutor specialized in math and science problem-solving
+  math_agent:
+    type: instance
+    models: [gemini-2.5-flash]
+    params:
+      name: math_agent
+      instruction:
+        function: load_prompt_template
+        type: file_load
+        file: templates/math.md
+      before_agent_callback: agent_invoke_callback
+      function: initialize_agent
+  script_agent:
+    type: instance
+    models: [gemini-2.5-flash]
+    params:
+      name: script_agent
+      instruction:
+        function: load_prompt_template
+        type: file_load
+        file: templates/script.md
+      before_agent_callback: agent_invoke_callback
+      function: initialize_agent
+  search_agent:
+    type: instance
+    models: [gemini-2.0-flash]
+    tools: [google_search]
+    params:
+      name: search_agent
+      instruction: ['You are an educational resource finder. When given a math or science problem context,', 'use Google Search
+          to find the most relevant educational resources. Focus on:', '1. Tutorial websites (Khan Academy, PatrickJMT, etc.)',
+        2. Step-by-step explanations, 3. Educational videos, 4. Interactive learning tools, 5. Practice problems, 'Format
+          your search queries to include educational terms like "tutorial", "step by step",', '"how to solve", "explanation",
+          and the specific mathematical concepts.']
+      description: An agent specialized in finding educational resources for math and science problems
+  service_chat_agent:
+    type: instance
+    models: [gemini-2.0-flash]
+    tools: [search_agent, conversation_agent]
+    params:
+      name: service_chat_agent
+      instruction: [You are an educational coordinator that manages learning assistance., 'You have access to specialized
+          agents:', 1. A search agent that finds educational resources, 2. A tutor agent that provides conversational help,
+        'When handling requests:', '- For conversations: delegate to the tutor agent for educational discussions', '- Always
+          maintain context about the educational problem being discussed']
+      description: Coordinates educational assistance between search and tutoring agents
+  video_agent:
+    type: instance
+    models: [gemini-2.5-flash]
+    params:
+      name: video_agent
+      instruction:
+        function: load_prompt_template
+        type: file_load
+        file: templates/video.md
+      before_agent_callback: agent_invoke_callback
+      after_model_callback: agent_response_callback
+      function: initialize_agent
+
+models:
+  gemini-2.0-flash:
+    type: literal
+    agents: [search_agent, conversation_agent, service_chat_agent]
+  gemini-2.5-flash:
+    type: literal
+    agents: [math_agent, script_agent, video_agent, agent]
+
+tools:
+  conversation_agent:
+    type: agent
+    agents: [service_chat_agent]
+    params:
+      wrapper: AgentTool
+      agent: conversation_agent
+  google_search:
+    type: module
+    agents: [search_agent]
+  math_agent:
+    type: agent
+    agents: [agent]
+    params:
+      wrapper: AgentTool
+      agent: math_agent
+  script_agent:
+    type: agent
+    agents: [agent]
+    params:
+      wrapper: AgentTool
+      agent: script_agent
+  search_agent:
+    type: agent
+    agents: [service_chat_agent]
+    params:
+      wrapper: AgentTool
+      agent: search_agent
+  video_agent:
+    type: agent
+    agents: [agent]
+    params:
+      wrapper: AgentTool
+      agent: video_agent
+
+imports:
+  Agent: google.adk.agents.Agent
+  AgentTool: google.adk.tools.agent_tool.AgentTool
+  Any: typing.Any
+  asyncio: asyncio
+  base64: base64
+  BaseModel: pydantic.BaseModel
+  Blob: google.genai.types.Blob
+  CallbackContext: google.adk.agents.callback_context.CallbackContext
+  compile_code_to_video: manim_gen.compile_code_to_video
+  Content: google.genai.types.Content
+  converse: service_chat.converse
+  CORSMiddleware: fastapi.middleware.cors.CORSMiddleware
+  dataclass: dataclasses.dataclass
+  datetime: datetime.datetime
+  Dict: typing.Dict
+  dotenv: dotenv
+  FastAPI: fastapi.FastAPI
+  fetch_desired_video: manim_gen.fetch_desired_video
+  File: fastapi.File
+  Form: fastapi.Form
+  generate_manim_video: service_manim.generate_manim_video
+  get_links: service_chat.get_links
+  glob: glob
+  google_search: google.adk.tools.google_search
+  HTTPException: fastapi.HTTPException
+  Image: PIL.Image
+  InMemorySessionService: google.adk.sessions.InMemorySessionService
+  io: io
+  json: json
+  List: typing.List
+  LlmAgent: google.adk.agents.LlmAgent
+  LlmResponse: google.adk.models.llm_response.LlmResponse
+  load_prompt_template: manim_utils.load_prompt_template
+  Optional: typing.Optional
+  os: os
+  parse_text_to_code: manim_gen.parse_text_to_code
+  Part: google.genai.types.Part
+  perf_counter: time.perf_counter
+  prepare_session: manim_agents.prepare_session
+  random: random
+  Runner: google.adk.Runner
+  SESSION_ID: manim_agents.SESSION_ID
+  subprocess: subprocess
+  time: time
+  Timer: manim_utils.Timer
+  types: google.genai.types
+  UploadFile: fastapi.UploadFile
+  USER_ID: manim_agents.USER_ID
+  uvicorn: uvicorn
+  write_code_to_file: manim_gen.write_code_to_file
+
+functions:
+  __enter__:
+    type: sync
+    module: backend.manim_utils
+    args: [self]
+  __exit__:
+    type: sync
+    module: backend.manim_utils
+    args: [self, exc_type, exc_value, traceback]
+  __init__:
+    type: sync
+    module: backend.manim_utils
+    args: [self, task]
+    params:
+      returns: None
+  _build_conversation_prompt:
+    type: sync
+    module: backend.service_chat
+    args: [chat_history, context]
+    params:
+      returns: str
+  _generate_follow_up_questions:
+    type: sync
+    module: backend.service_chat
+    args: [response]
+    params:
+      returns: List[str]
+  _generate_suggestions:
+    type: sync
+    module: backend.service_chat
+    args: [chat_history, response]
+    params:
+      returns: List[str]
+  _get_fallback_links:
+    type: sync
+    module: backend.service_chat
+    params:
+      returns: List[Dict]
+  _parse_search_response:
+    type: sync
+    module: backend.service_chat
+    args: [agent_response]
+    params:
+      returns: List[Dict]
+  _process_conversation_response:
+    type: sync
+    module: backend.service_chat
+    args: [agent_response, chat_history]
+    params:
+      returns: Dict
+  agent_invoke_callback:
+    type: sync
+    module: backend.manim_agents
+    args: [callback_context]
+    params:
+      returns: None
+  agent_response_callback:
+    type: sync
+    module: backend.manim_agents
+    args: [callback_context, llm_response]
+    params:
+      returns: None
+  call_chat_agent:
+    type: async
+    module: backend.service_chat
+    args: [content]
+  chat:
+    type: async
+    module: backend.main
+    args: [data]
+  compile_code_to_video:
+    type: sync
+    module: backend.manim_gen
+    args: [file_name]
+    params:
+      returns: None
+  converse:
+    type: async
+    module: backend.service_chat
+    args: [chat_history, image_data]
+    params:
+      returns: Dict
+  convert_base64_image_to_part:
+    type: sync
+    module: backend.service_chat
+    args: [image_base64]
+    params:
+      returns: Part
+  convert_image_bytes_to_part:
+    type: sync
+    module: backend.service_chat
+    args: [image_data]
+    params:
+      returns: Part
+  convert_image_to_part:
+    type: sync
+    module: backend.service_manim
+    args: [image]
+    params:
+      returns: Part
+  fetch_desired_video:
+    type: sync
+    module: backend.manim_gen
+    params:
+      returns: str
+  fetch_latest_code_file:
+    type: sync
+    module: backend.manim_gen
+    params:
+      returns: str
+  fetch_video:
+    type: sync
+    module: backend.manim_gen
+    args: [file_name]
+    params:
+      returns: str
+  fetech_latest_video_file:
+    type: sync
+    module: backend.manim_gen
+    params:
+      returns: str
+  generate_manim_video:
+    type: async
+    module: backend.service_manim
+    args: [image, context]
+    params:
+      returns: str
+  get_links:
+    type: async
+    module: backend.service_chat
+    args: [image_data, context]
+    params:
+      returns: List[Dict]
+  initialize_agent:
+    type: sync
+    module: backend.manim_agents
+    params:
+      returns: Agent
+  invoke_agent:
+    type: async
+    module: backend.service_manim
+    args: [context]
+    params:
+      returns: str
+  links:
+    type: async
+    module: backend.main
+    args: [context, image]
+  load_prompt_template:
+    type: sync
+    module: backend.manim_utils
+    args: [template_path]
+    params:
+      returns: str
+  manim:
+    type: async
+    module: backend.main
+    args: [context, image]
+  parse_text_to_code:
+    type: sync
+    module: backend.manim_gen
+    args: [text]
+    params:
+      returns: str
+  prepare_session:
+    type: async
+    module: backend.manim_agents
+    params:
+      returns: Runner
+  random_chars:
+    type: sync
+    module: backend.manim_gen
+    params:
+      returns: str
+  read_root:
+    type: async
+    module: backend.main
+  setup_session_and_runner:
+    type: async
+    module: backend.service_chat
+  write_code_to_file:
+    type: sync
+    module: backend.manim_gen
+    args: [code]
+    params:
+      returns: str
+
+files:
+  ./manim/media/:
+    type: variable
+    actions: [read]
+    params:
+      caller: [os.makedirs]
+  ./manim/scripts/:
+    type: variable
+    actions: [read]
+    params:
+      caller: [os.makedirs]
+  ./manim/videos/:
+    type: variable
+    actions: [read]
+    params:
+      caller: [os.makedirs]
+  file_path:
+    type: variable
+    actions: [write]
+    params:
+      caller: [open]
+      alias: [file]
+  pattern/:
+    type: variable
+    actions: [read]
+    params:
+      links: [pattern]
+      caller: [fetch_latest_code_file, fetech_latest_video_file]
+  template_path:
+    type: variable
+    actions: [read]
+    params:
+      caller: [open]
+      alias: [file]
+  video_path:
+    type: variable
+    actions: [read]
+    params:
+      caller: [os.path.abspath, open]
